@@ -1,22 +1,21 @@
 import { createApp } from "@/app";
-import { runMigrations } from "@/db/migrate";
-import { closePostgres, isPostgresConfigured, pingPostgres } from "@/db/postgres";
+import { closeSupabase, isSupabaseConfigured, pingSupabase } from "@/db/supabase";
 
 const PORT = Number(process.env.PORT) || 3001;
 
 async function main() {
-  if (!isPostgresConfigured()) {
-    console.error("DATABASE_URL is required (PostgreSQL).");
+  if (!isSupabaseConfigured()) {
+    console.error(
+      "SUPABASE_URL and SUPABASE_ANON_KEY are required (or NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).",
+    );
     process.exit(1);
   }
 
   try {
-    await pingPostgres();
-    console.log("Postgres: connection ok");
-    await runMigrations();
-    console.log("Postgres: migrations applied");
+    await pingSupabase();
+    console.log("Supabase: connection ok");
   } catch (e) {
-    console.error("Postgres: startup failed", e);
+    console.error("Supabase: startup failed", e);
     process.exit(1);
   }
 
@@ -28,7 +27,7 @@ async function main() {
   });
 
   const shutdown = async () => {
-    await closePostgres();
+    await closeSupabase();
     server.stop();
     process.exit(0);
   };

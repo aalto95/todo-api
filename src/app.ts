@@ -4,7 +4,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { ZodError } from "zod";
 import { isOriginAllowed } from "@/config/cors";
-import { isPostgresConfigured, pingPostgres } from "@/db/postgres";
+import { isSupabaseConfigured, pingSupabase } from "@/db/supabase";
 import { HealthResponse } from "@/openapi/schemas";
 import { todoRoutes } from "@/routes/todo";
 
@@ -22,11 +22,11 @@ const healthRoute = createRoute({
   operationId: "getHealth",
   responses: {
     200: {
-      description: "OK (Postgres reachable)",
+      description: "OK (Supabase reachable)",
       content: { "application/json": { schema: HealthResponse } },
     },
     503: {
-      description: "Postgres missing or unreachable",
+      description: "Supabase missing or unreachable",
       content: { "application/json": { schema: HealthResponse } },
     },
   },
@@ -78,21 +78,21 @@ export function createApp() {
   });
 
   app.openapi(healthRoute, async (c) => {
-    let postgres: "connected" | "unconfigured" | "error" = "unconfigured";
-    if (isPostgresConfigured()) {
+    let supabase: "connected" | "unconfigured" | "error" = "unconfigured";
+    if (isSupabaseConfigured()) {
       try {
-        await pingPostgres();
-        postgres = "connected";
+        await pingSupabase();
+        supabase = "connected";
       } catch {
-        postgres = "error";
+        supabase = "error";
       }
     }
-    const ok = postgres === "connected";
+    const ok = supabase === "connected";
     return c.json(
       {
         ok,
         service: "todo-api",
-        postgres,
+        supabase,
       },
       ok ? 200 : 503,
     );

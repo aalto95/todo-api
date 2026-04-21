@@ -4,7 +4,7 @@ export const HealthResponse = z
   .object({
     ok: z.boolean(),
     service: z.string(),
-    postgres: z.enum(["connected", "unconfigured", "error"]),
+    supabase: z.enum(["connected", "unconfigured", "error"]),
   })
   .openapi("HealthResponse");
 

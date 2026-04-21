@@ -1,4 +1,4 @@
-import { getSql } from "@/db/postgres";
+import { getSupabase } from "@/db/supabase";
 
 export type Todo = {
   id: string;
@@ -7,7 +7,14 @@ export type Todo = {
   dueDate?: string;
 };
 
-function rowToTodo(row: { id: string; name: string; text: string; due_date: string | null }): Todo {
+type TodoRow = {
+  id: string;
+  name: string;
+  text: string;
+  due_date: string | null;
+};
+
+function rowToTodo(row: TodoRow): Todo {
   return {
     id: row.id,
     name: row.name,
@@ -16,47 +23,65 @@ function rowToTodo(row: { id: string; name: string; text: string; due_date: stri
   };
 }
 
+function sbError(e: { message: string }) {
+  return new Error(e.message);
+}
+
 export async function getTodosPage(query: { page?: number; limit?: number }) {
-  const sql = getSql();
+  const supabase = getSupabase();
   const page = query.page ?? 1;
   const limit = query.limit ?? 10;
   const offset = (page - 1) * limit;
+  const rangeEnd = offset + limit - 1;
 
-  const countRows = await sql<{ c: number }[]>`select count(*)::int as c from todos`;
-  const total = countRows[0]?.c ?? 0;
+  const { count, error: countError } = await supabase
+    .from("todos")
+    .select("*", { count: "exact", head: true });
+
+  if (countError) throw sbError(countError);
+
+  const total = count ?? 0;
   const totalPages = Math.ceil(total / limit) || 0;
 
-  const rows = await sql<{ id: string; name: string; text: string; due_date: string | null }[]>`
-    select id::text, name, text, due_date
-    from todos
-    order by id
-    limit ${limit}
-    offset ${offset}
-  `;
+  const { data: rows, error } = await supabase
+    .from("todos")
+    .select("id, name, text, due_date")
+    .order("id", { ascending: true })
+    .range(offset, rangeEnd);
+
+  if (error) throw sbError(error);
 
   return {
-    data: rows.map(rowToTodo),
+    data: (rows ?? []).map((r) => rowToTodo(r as TodoRow)),
     total,
     totalPages,
   };
 }
 
 export async function getTodoById(id: string): Promise<Todo | undefined> {
-  const sql = getSql();
-  const rows = await sql<{ id: string; name: string; text: string; due_date: string | null }[]>`
-    select id::text, name, text, due_date from todos where id = ${id}::uuid
-  `;
-  const row = rows[0];
-  return row ? rowToTodo(row) : undefined;
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("todos")
+    .select("id, name, text, due_date")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw sbError(error);
+  if (!data) return undefined;
+  return rowToTodo(data as TodoRow);
 }
 
 export async function addTodo(todoData: { name: string; text: string; dueDate?: string }) {
-  const sql = getSql();
+  const supabase = getSupabase();
   const id = crypto.randomUUID();
-  await sql`
-    insert into todos (id, name, text, due_date)
-    values (${id}::uuid, ${todoData.name}, ${todoData.text}, ${todoData.dueDate ?? null})
-  `;
+  const { error } = await supabase.from("todos").insert({
+    id,
+    name: todoData.name,
+    text: todoData.text,
+    due_date: todoData.dueDate ?? null,
+  });
+
+  if (error) throw sbError(error);
   return { success: true as const, data: todoData };
 }
 
@@ -72,12 +97,18 @@ export async function updateTodo(id: string, todoData: Record<string, unknown>) 
   const dueDate =
     dueRaw === undefined ? (current.dueDate ?? null) : dueRaw === null ? null : String(dueRaw);
 
-  const sql = getSql();
-  await sql`
-    update todos
-    set name = ${name}, text = ${text}, due_date = ${dueDate}
-    where id = ${id}::uuid
-  `;
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("todos")
+    .update({
+      name,
+      text,
+      due_date: dueDate,
+    })
+    .eq("id", id);
+
+  if (error) throw sbError(error);
+
   const data = await getTodoById(id);
   if (!data) {
     throw new Error(`Todo with id ${id} disappeared after update`);
@@ -86,7 +117,8 @@ export async function updateTodo(id: string, todoData: Record<string, unknown>) 
 }
 
 export async function deleteTodo(id: string) {
-  const sql = getSql();
-  await sql`delete from todos where id = ${id}::uuid`;
+  const supabase = getSupabase();
+  const { error } = await supabase.from("todos").delete().eq("id", id);
+  if (error) throw sbError(error);
   return { success: true as const };
 }
