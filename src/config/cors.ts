@@ -7,8 +7,8 @@ export function corsAllowedOrigins(): string[] {
     "http://localhost:3001",
     "http://localhost:5173",
     "http://localhost:5174",
-    "https://sdui-orchestrator.onrender.com",
-    "https://sdui-admin-tau.vercel.app",
+    "https://sdui-example.vercel.app",
+    "https://todo-api-eight-ochre.vercel.app",
     vercelRendererOrigin(),
   ];
 }
