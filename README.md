@@ -88,4 +88,5 @@ src/
 
 `.env.development` and `.env.example` are provided; secrets are not committed. The API uses
 the Supabase anon key and expects the `todos` table to exist with the columns referenced by
-`src/db/todosRepo.ts` (`id`, `name`, `text`, `dueDate`).
+`src/db/todosRepo.ts` (`id`, `name`, `text`, `due_date`). The API exposes `due_date` as
+camelCase `dueDate` in requests and responses.
